@@ -24,7 +24,7 @@ set -e
 set -o pipefail
 set -o errexit
 
-MVN_TEST_OPTIONS='mvn -B -ntp -DskipSourceReleaseAssembly=true -DskipBuildDistribution=true -Dspotbugs.skip=true -Dlicense.skip=true -Dcheckstyle.skip=true -Drat.skip=true'
+MVN_TEST_OPTIONS='./mvnw -B -ntp -DskipSourceReleaseAssembly=true -DskipBuildDistribution=true -Dspotbugs.skip=true -Dlicense.skip=true -Dcheckstyle.skip=true -Drat.skip=true'
 
 function mvn_test() {
   (
@@ -76,31 +76,31 @@ alias echo='{ [[ $- =~ .*x.* ]] && trace_enabled=1 || trace_enabled=0; set +x; }
 
 # Test Groups  -- start --
 function test_group_broker_group_1() {
-  mvn_test -pl pulsar-broker -Dgroups='broker' -DtestReuseFork=true
+  mvn_test --no-fail-fast -pl pulsar-broker -Dgroups='broker' -DtestReuseFork=true
 }
 
 function test_group_broker_group_2() {
-  mvn_test -pl pulsar-broker -Dgroups='schema,utils,functions-worker,broker-io,broker-discovery,broker-compaction,broker-naming,websocket,other'
+  mvn_test --no-fail-fast -pl pulsar-broker -Dgroups='schema,utils,functions-worker,broker-io,broker-discovery,broker-compaction,broker-naming,websocket,other'
 }
 
 function test_group_broker_group_3() {
-  mvn_test -pl pulsar-broker -Dgroups='broker-admin'
+  mvn_test --no-fail-fast -pl pulsar-broker -Dgroups='broker-admin'
 }
 
 function test_group_broker_group_4() {
-  mvn_test -pl pulsar-broker -Dgroups='cluster-migration'
+  mvn_test --no-fail-fast -pl pulsar-broker -Dgroups='cluster-migration'
 }
 
 function test_group_broker_client_api() {
-  mvn_test -pl pulsar-broker -Dgroups='broker-api'
+  mvn_test --no-fail-fast -pl pulsar-broker -Dgroups='broker-api'
 }
 
 function test_group_broker_client_impl() {
-  mvn_test -pl pulsar-broker -Dgroups='broker-impl'
+  mvn_test --no-fail-fast -pl pulsar-broker -Dgroups='broker-impl'
 }
 
 function test_group_client() {
-  mvn_test -pl pulsar-client
+  mvn_test --no-fail-fast -pl pulsar-client
 }
 
 # prints summaries of failed tests to console

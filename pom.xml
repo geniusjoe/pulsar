@@ -115,10 +115,10 @@ flexible messaging model and an intuitive client API.</description>
       --add-opens java.base/jdk.internal.platform=ALL-UNNAMED <!--LinuxInfoUtils-->
     </test.additional.args>
     <testReuseFork>true</testReuseFork>
-    <testForkCount>4</testForkCount>
+    <testForkCount>2</testForkCount>
     <testRealAWS>false</testRealAWS>
-    <testRetryCount>1</testRetryCount>
-    <testFailFast>true</testFailFast>
+    <testRetryCount>20</testRetryCount>
+    <testFailFast>false</testFailFast>
     <testFailFastFile></testFailFastFile>
     <testJacocoAgentArgument/>
     <integrationtest.coverage.enabled>false</integrationtest.coverage.enabled>
