@@ -36,6 +36,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.regex.Pattern;
 import lombok.Cleanup;
 import lombok.Data;
 import org.apache.avro.reflect.Nullable;
@@ -261,7 +262,12 @@ public class DeadLetterTopicTest extends ProducerConsumerBase {
         final String topic = "persistent://my-property/my-ns/dead-letter-topic";
         final String subscription = "my-subscription";
         final String consumerName = "my-consumer";
-        String deadLetterProducerName = String.format("%s-%s-%s-DLQ", topic, subscription, consumerName);
+        Pattern deadLetterProducerNamePattern =
+                Pattern.compile("^persistent://my-property/my-ns/dead-letter-topic"
+                        + "-my-subscription"
+                        + "-my-consumer"
+                        + "-[a-zA-Z0-9]{5}"
+                        + "-DLQ$");
 
         final int maxRedeliveryCount = 1;
 
@@ -308,8 +314,9 @@ public class DeadLetterTopicTest extends ProducerConsumerBase {
         int totalInDeadLetter = 0;
         do {
             Message message = deadLetterConsumer.receive();
-            assertEquals(message.getProducerName(), deadLetterProducerName);
-            log.info("dead letter consumer received message : {} {}", message.getMessageId(), new String(message.getData()));
+            assertTrue(deadLetterProducerNamePattern.matcher(message.getProducerName()).matches());
+            log.info("dead letter consumer received message : {} {}, dead letter producer name : {}",
+                    message.getMessageId(), new String(message.getData()), message.getProducerName());
             deadLetterConsumer.acknowledge(message);
             totalInDeadLetter++;
         } while (totalInDeadLetter < sendMessages);
