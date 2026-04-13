@@ -1380,6 +1380,68 @@ public class SchemaTest extends MockedPulsarServiceBaseTest {
         producers2.clear();
     }
 
+    /**
+     * Test that when multiple producers concurrently create schema for a brand-new topic,
+     * the orphan BookKeeper ledgers created by the losing requests are properly cleaned up.
+     */
+    @Test
+    public void testConcurrentCreateSchemaNoOrphanLedger() throws Exception {
+        final String namespace = "test-namespace-" + randomName(16);
+        String ns = PUBLIC_TENANT + "/" + namespace;
+        admin.namespaces().createNamespace(ns, Sets.newHashSet(CLUSTER_NAME));
+
+        final String topic = getTopicName(ns, "testConcurrentCreateSchemaNoOrphanLedger");
+        final String schemaName = TopicName.get(topic).getSchemaName();
+
+        org.apache.bookkeeper.client.PulsarMockBookKeeper mockBk =
+                (org.apache.bookkeeper.client.PulsarMockBookKeeper) pulsar.getBookKeeperClient();
+
+        // Concurrently create producers with the same schema on a brand-new topic
+        int concurrency = 16;
+        @Cleanup("shutdownNow")
+        ExecutorService executor = Executors.newFixedThreadPool(concurrency);
+        List<CompletableFuture<Producer<Schemas.PersonOne>>> producers = new ArrayList<>(concurrency);
+        CountDownLatch latch = new CountDownLatch(concurrency);
+        for (int i = 0; i < concurrency; i++) {
+            executor.execute(() -> {
+                producers.add(pulsarClient.newProducer(Schema.AVRO(Schemas.PersonOne.class))
+                        .topic(topic).createAsync());
+                latch.countDown();
+            });
+        }
+        latch.await();
+        FutureUtil.waitForAll(producers).join();
+
+        // Verify only 1 schema version exists
+        assertEquals(admin.schemas().getAllSchemas(topic).size(), 1);
+
+        // Count surviving BK ledgers whose customMetadata "pulsar/schemaId" matches this topic's schemaName.
+        // If orphan ledgers were not cleaned up, there would be more than 1.
+        int schemaLedgerCount = 0;
+        for (org.apache.bookkeeper.client.PulsarMockLedgerHandle lh
+                : mockBk.getLedgerMap().values()) {
+            Map<String, byte[]> metadata = lh.getLedgerMetadata().getCustomMetadata();
+            byte[] schemaIdBytes = metadata.get("pulsar/schemaId");
+            if (schemaIdBytes != null
+                    && schemaName.equals(
+                            new String(schemaIdBytes, java.nio.charset.StandardCharsets.UTF_8))) {
+                schemaLedgerCount++;
+            }
+        }
+        assertEquals(schemaLedgerCount, 1,
+                "Expected exactly 1 schema ledger for the topic, but found "
+                        + schemaLedgerCount + ". Orphan ledgers were not cleaned up.");
+
+        // Cleanup
+        producers.forEach(p -> {
+            try {
+                p.join().close();
+            } catch (Exception ignore) {
+            }
+        });
+        producers.clear();
+    }
+
     @EqualsAndHashCode
     static class User implements Serializable {
         private String name;
