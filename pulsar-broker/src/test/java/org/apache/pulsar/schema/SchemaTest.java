@@ -55,6 +55,7 @@ import lombok.EqualsAndHashCode;
 import org.apache.avro.Schema.Parser;
 import org.apache.bookkeeper.client.BKException;
 import org.apache.bookkeeper.client.BookKeeper;
+import org.apache.bookkeeper.mledger.impl.LedgerMetadataUtils;
 import org.apache.pulsar.broker.BrokerTestUtil;
 import org.apache.pulsar.broker.auth.MockedPulsarServiceBaseTest;
 import org.apache.pulsar.broker.service.schema.BookkeeperSchemaStorage;
@@ -1400,13 +1401,17 @@ public class SchemaTest extends MockedPulsarServiceBaseTest {
         int concurrency = 16;
         @Cleanup("shutdownNow")
         ExecutorService executor = Executors.newFixedThreadPool(concurrency);
-        List<CompletableFuture<Producer<Schemas.PersonOne>>> producers = new ArrayList<>(concurrency);
+        List<CompletableFuture<Producer<Schemas.PersonOne>>> producers =
+                Collections.synchronizedList(new ArrayList<>(concurrency));
         CountDownLatch latch = new CountDownLatch(concurrency);
         for (int i = 0; i < concurrency; i++) {
             executor.execute(() -> {
-                producers.add(pulsarClient.newProducer(Schema.AVRO(Schemas.PersonOne.class))
-                        .topic(topic).createAsync());
-                latch.countDown();
+                try {
+                    producers.add(pulsarClient.newProducer(Schema.AVRO(Schemas.PersonOne.class))
+                            .topic(topic).createAsync());
+                } finally {
+                    latch.countDown();
+                }
             });
         }
         latch.await();
@@ -1418,13 +1423,11 @@ public class SchemaTest extends MockedPulsarServiceBaseTest {
         // Count surviving BK ledgers whose customMetadata "pulsar/schemaId" matches this topic's schemaName.
         // If orphan ledgers were not cleaned up, there would be more than 1.
         int schemaLedgerCount = 0;
-        for (org.apache.bookkeeper.client.PulsarMockLedgerHandle lh
-                : mockBk.getLedgerMap().values()) {
+        for (org.apache.bookkeeper.client.PulsarMockLedgerHandle lh : mockBk.getLedgerMap().values()) {
             Map<String, byte[]> metadata = lh.getLedgerMetadata().getCustomMetadata();
-            byte[] schemaIdBytes = metadata.get("pulsar/schemaId");
+            byte[] schemaIdBytes = metadata.get(LedgerMetadataUtils.METADATA_PROPERTY_SCHEMAID);
             if (schemaIdBytes != null
-                    && schemaName.equals(
-                            new String(schemaIdBytes, java.nio.charset.StandardCharsets.UTF_8))) {
+                    && schemaName.equals(new String(schemaIdBytes, java.nio.charset.StandardCharsets.UTF_8))) {
                 schemaLedgerCount++;
             }
         }
