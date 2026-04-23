@@ -376,13 +376,19 @@ public class BookkeeperSchemaStorage implements SchemaStorage {
                     return;
                 }
                 Throwable cause = FutureUtil.unwrapCompletionException(ex);
-                log.warn("[{}] Failed to create schema locator with position {}", schemaId, position, cause);
+                log.warn()
+                        .attr("schemaId", schemaId)
+                        .attr("ledgerId", position.getLedgerId())
+                        .exception(cause)
+                        .log("Failed to create schema locator with position");
                 if (cause instanceof AlreadyExistsException || cause instanceof BadVersionException) {
                     bookKeeper.asyncDeleteLedger(position.getLedgerId(), (rc, ctx) -> {
                         if (rc != BKException.Code.OK) {
-                            log.warn("[{}] Failed to delete orphan ledger {}"
-                                            + " after schema locator creation failed, rc: {}",
-                                    schemaId, position.getLedgerId(), rc);
+                            log.warn()
+                                    .attr("schemaId", schemaId)
+                                    .attr("ledgerId", position.getLedgerId())
+                                    .attr("rc", rc)
+                                    .log("Failed to delete orphan ledger after schema locator creation failed");
                         }
                     }, null);
                 }
@@ -503,7 +509,7 @@ public class BookkeeperSchemaStorage implements SchemaStorage {
                 Throwable cause = FutureUtil.unwrapCompletionException(ex);
                 log.warn()
                         .attr("schemaId", schemaId)
-                        .attr("position", position)
+                        .attr("ledgerId", position.getLedgerId())
                         .exception(cause)
                         .log("Failed to update schema locator with position");
                 if (cause instanceof AlreadyExistsException || cause instanceof BadVersionException) {
