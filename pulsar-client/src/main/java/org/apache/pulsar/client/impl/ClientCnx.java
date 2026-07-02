@@ -1008,8 +1008,7 @@ public class ClientCnx extends PulsarHandler {
         if (pendingLookupRequestSemaphore.tryAcquire()) {
             future.whenComplete((lookupDataResult, throwable) -> {
                 if (throwable instanceof ConnectException
-                        || throwable instanceof PulsarClientException.LookupException
-                        || FutureUtil.unwrapCompletionException(throwable) instanceof TimeoutException) {
+                        || throwable instanceof PulsarClientException.LookupException) {
                     pendingLookupRequestSemaphore.release();
                 }
             });
@@ -1796,7 +1795,13 @@ public class ClientCnx extends PulsarHandler {
             TimedCompletableFuture<?> requestFuture = pendingRequests.get(request.requestId);
             if (requestFuture != null
                     && !requestFuture.hasGotResponse()) {
-                pendingRequests.remove(request.requestId, requestFuture);
+                if (request.requestType == RequestType.Lookup) {
+                    // For Lookup type, use getAndRemovePendingLookupRequest to release the semaphore
+                    // and drive the waiting queue
+                    getAndRemovePendingLookupRequest(request.requestId);
+                } else {
+                    pendingRequests.remove(request.requestId, requestFuture);
+                }
                 if (!requestFuture.isDone()) {
                     String timeoutMessage = request.requestType.getDescription() + " timeout";
                     if (requestFuture.completeExceptionally(new TimeoutException(timeoutMessage))) {
