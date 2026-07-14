@@ -833,29 +833,6 @@ public class ClientCnx extends PulsarHandler {
     }
 
     /**
-     * Unified cleanup primitive for all pending requests.
-     * Uses pendingRequests.remove(requestId, expectedFuture) as the single CAS contention point.
-     * Only the thread that successfully removes the entry from pendingRequests owns the cleanup
-     * responsibility (including permit release for lookup requests).
-     *
-     * @param requestId the request ID to remove
-     * @param expectedFuture the expected future value for CAS comparison
-     * @return true if this call successfully obtained ownership and performed cleanup
-     */
-    private boolean removePendingRequest(long requestId, CompletableFuture<?> expectedFuture) {
-        // CAS: only one thread can successfully remove from pendingRequests
-        if (!pendingRequests.remove(requestId, expectedFuture)) {
-            return false;
-        }
-        // Won the CAS. If it's a lookup request, release the permit and drive waiting queue.
-        if (pendingLookupRequestIds.contains(requestId)) {
-            releasePermitAndDriveWaitingQueue();
-            pendingLookupRequestIds.remove(requestId);
-        }
-        return true;
-    }
-
-    /**
      * Release the lookup semaphore permit and drive the waiting queue.
      * This is the single centralized primitive for permit release/transfer.
      */
@@ -884,6 +861,29 @@ public class ClientCnx extends PulsarHandler {
         } else {
             pendingLookupRequestSemaphore.release();
         }
+    }
+
+    /**
+     * Unified cleanup primitive for all pending requests.
+     * Uses pendingRequests.remove(requestId, expectedFuture) as the single CAS contention point.
+     * Only the thread that successfully removes the entry from pendingRequests owns the cleanup
+     * responsibility (including permit release for lookup requests).
+     *
+     * @param requestId the request ID to remove
+     * @param expectedFuture the expected future value for CAS comparison
+     * @return true if this call successfully obtained ownership and performed cleanup
+     */
+    private boolean removePendingRequest(long requestId, CompletableFuture<?> expectedFuture) {
+        // CAS: only one thread can successfully remove from pendingRequests
+        if (!pendingRequests.remove(requestId, expectedFuture)) {
+            return false;
+        }
+        // Won the CAS. If it's a lookup request, release the permit and drive waiting queue.
+        if (pendingLookupRequestIds.contains(requestId)) {
+            releasePermitAndDriveWaitingQueue();
+            pendingLookupRequestIds.remove(requestId);
+        }
+        return true;
     }
 
     @Override
