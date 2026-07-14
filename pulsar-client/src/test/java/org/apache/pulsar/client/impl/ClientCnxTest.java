@@ -648,9 +648,8 @@ public class ClientCnxTest {
             assertTrue(firstFuture.isCompletedExceptionally());
 
             // Wait for the second request to be promoted from the waiting queue
-            Awaitility.await().atMost(2, TimeUnit.SECONDS).untilAsserted(() -> {
-                assertEquals(cnx.getPendingLookupRequestSemaphore().availablePermits(), 0);
-            });
+            Awaitility.await().atMost(2, TimeUnit.SECONDS)
+                    .until(() -> cnx.pendingRequests.containsKey(2L));
 
             // Now close the connection while the promoted request is active
             cnx.channelInactive(ctx);

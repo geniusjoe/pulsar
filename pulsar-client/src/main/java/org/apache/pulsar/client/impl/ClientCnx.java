@@ -398,7 +398,7 @@ public class ClientCnx extends PulsarHandler {
         waitingLookupRequests.clear();
         // Fail out all the pending ops
         pendingRequests.forEach((key, future) -> {
-            if (!future.isDone() && removePendingRequest(key, future)) {
+            if (removePendingRequest(key, future) && !future.isDone()) {
                 future.completeExceptionally(e);
             }
         });
